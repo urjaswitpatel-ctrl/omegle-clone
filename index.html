@@ -30,12 +30,21 @@ input,button{padding:10px;margin:5px}
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-firebase.initializeApp({
-  apiKey: "FREE",
-  authDomain: "FREE.firebaseapp.com",
-  databaseURL: "https://FREE.firebaseio.com",
-  projectId: "FREE"
-});
+ const firebaseConfig = {
+    apiKey: "AIzaSyAjJgGAOLAtVx_7Wp0PzOxsvs_1_ChVSXM",
+    authDomain: "bpthyou.firebaseapp.com",
+    databaseURL: "https://bpthyou-default-rtdb.firebaseio.com",
+    projectId: "bpthyou",
+    storageBucket: "bpthyou.firebasestorage.app",
+    messagingSenderId: "1093711275078",
+    appId: "1:1093711275078:web:a75668ccab231e094d5647"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
+  firebase.initializeApp(firebaseConfig);
+
 const db=firebase.database();
 
 let pc,room,stream;
