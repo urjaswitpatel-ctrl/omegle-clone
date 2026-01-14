@@ -1,75 +1,91 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Stranger Video Chat</title>
-  <style>
-    body { background:#000; color:white; text-align:center; font-family:sans-serif }
-    video { width:45%; margin:5px; border-radius:10px }
-    button { padding:12px 20px; font-size:16px; cursor:pointer }
-  </style>
+<title>Stranger Chat</title>
+<style>
+body{background:#000;color:#fff;font-family:sans-serif;text-align:center}
+video{width:45%;border-radius:10px;margin:5px}
+#chat{height:120px;overflow:auto;border:1px solid #555;margin:10px;padding:5px}
+input,button{padding:10px;margin:5px}
+</style>
 </head>
+
 <body>
 
 <h2>Stranger Video Chat</h2>
-<button onclick="start()">Start</button>
 
-<br><br>
+<button onclick="start()">Start</button>
+<button onclick="next()">Next</button>
+
+<br>
 
 <video id="local" autoplay muted></video>
 <video id="remote" autoplay></video>
+
+<div id="chat"></div>
+<input id="msg" placeholder="Type message"/>
+<button onclick="send()">Send</button>
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-const firebaseConfig = {
-  apiKey: "FREE_KEY",
+firebase.initializeApp({
+  apiKey: "FREE",
   authDomain: "FREE.firebaseapp.com",
   databaseURL: "https://FREE.firebaseio.com",
   projectId: "FREE"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+});
+const db=firebase.database();
 
-let pc;
-const ice = { iceServers:[{ urls:"stun:stun.l.google.com:19302" }] };
+let pc,room,stream;
+const ice={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};
 
-async function start() {
-  pc = new RTCPeerConnection(ice);
+async function start(){
+  room=db.ref("rooms").push();
+  pc=new RTCPeerConnection(ice);
 
-  const stream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  document.getElementById("local").srcObject = stream;
+  stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  local.srcObject=stream;
   stream.getTracks().forEach(t=>pc.addTrack(t,stream));
 
-  pc.ontrack = e => document.getElementById("remote").srcObject = e.streams[0];
+  pc.ontrack=e=>remote.srcObject=e.streams[0];
 
-  const offer = await pc.createOffer();
+  pc.onicecandidate=e=>{
+    if(e.candidate) room.child("ice").push(e.candidate.toJSON());
+  };
+
+  const offer=await pc.createOffer();
   await pc.setLocalDescription(offer);
+  room.set({offer});
 
-  const ref = db.ref("calls").push();
-  ref.set({ offer });
-
-  ref.on("value", snap => {
-    const data = snap.val();
-    if (data && data.answer && !pc.currentRemoteDescription) {
-      pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+  db.ref("rooms").limitToFirst(1).on("child_added",async s=>{
+    if(s.key!==room.key){
+      await pc.setRemoteDescription(new RTCSessionDescription(s.val().offer));
+      const answer=await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      s.ref.update({answer});
+      room=s.ref;
     }
   });
 
-  pc.onicecandidate = e => {
-    if (e.candidate) ref.child("ice").push(e.candidate.toJSON());
-  };
-
-  db.ref("calls").limitToFirst(1).once("value", async snap => {
-    snap.forEach(async child => {
-      if (child.key !== ref.key) {
-        await pc.setRemoteDescription(new RTCSessionDescription(child.val().offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        child.ref.update({ answer });
-      }
-    });
+  room.on("value",s=>{
+    if(s.val()?.answer && !pc.currentRemoteDescription)
+      pc.setRemoteDescription(new RTCSessionDescription(s.val().answer));
   });
+
+  room.child("chat").on("child_added",s=>{
+    chat.innerHTML+=`<div>${s.val()}</div>`;
+  });
+}
+
+function send(){
+  room.child("chat").push(msg.value);
+  msg.value="";
+}
+
+function next(){
+  location.reload();
 }
 </script>
 
