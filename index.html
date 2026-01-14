@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Stranger Video Chat</title>
+  <style>
+    body { background:#000; color:white; text-align:center; font-family:sans-serif }
+    video { width:45%; margin:5px; border-radius:10px }
+    button { padding:12px 20px; font-size:16px; cursor:pointer }
+  </style>
+</head>
+<body>
+
+<h2>Stranger Video Chat</h2>
+<button onclick="start()">Start</button>
+
+<br><br>
+
+<video id="local" autoplay muted></video>
+<video id="remote" autoplay></video>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "FREE_KEY",
+  authDomain: "FREE.firebaseapp.com",
+  databaseURL: "https://FREE.firebaseio.com",
+  projectId: "FREE"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let pc;
+const ice = { iceServers:[{ urls:"stun:stun.l.google.com:19302" }] };
+
+async function start() {
+  pc = new RTCPeerConnection(ice);
+
+  const stream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  document.getElementById("local").srcObject = stream;
+  stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+
+  pc.ontrack = e => document.getElementById("remote").srcObject = e.streams[0];
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  const ref = db.ref("calls").push();
+  ref.set({ offer });
+
+  ref.on("value", snap => {
+    const data = snap.val();
+    if (data && data.answer && !pc.currentRemoteDescription) {
+      pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+    }
+  });
+
+  pc.onicecandidate = e => {
+    if (e.candidate) ref.child("ice").push(e.candidate.toJSON());
+  };
+
+  db.ref("calls").limitToFirst(1).once("value", async snap => {
+    snap.forEach(async child => {
+      if (child.key !== ref.key) {
+        await pc.setRemoteDescription(new RTCSessionDescription(child.val().offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        child.ref.update({ answer });
+      }
+    });
+  });
+}
+</script>
+
+</body>
+</html>
