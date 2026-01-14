@@ -29,73 +29,71 @@ input,button{padding:10px;margin:5px}
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-<script
- const firebaseConfig = {
-    apiKey: "AIzaSyAjJgGAOLAtVx_7Wp0PzOxsvs_1_ChVSXM",
-    authDomain: "bpthyou.firebaseapp.com",
-    databaseURL: "https://bpthyou-default-rtdb.firebaseio.com",
-    projectId: "bpthyou",
-    storageBucket: "bpthyou.firebasestorage.app",
-    messagingSenderId: "1093711275078",
-    appId: "1:1093711275078:web:a75668ccab231e094d5647"
-  };
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyAjJgGAOLAtVx_7Wp0PzOxsvs_1_ChVSXM",
+  authDomain: "bpthyou.firebaseapp.com",
+  databaseURL: "https://bpthyou-default-rtdb.firebaseio.com",
+  projectId: "bpthyou",
+  storageBucket: "bpthyou.appspot.com",
+  messagingSenderId: "1093711275078",
+  appId: "1:1093711275078:web:a75668ccab231e094d5647"
+});
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
+const db = firebase.database();
 
-  firebase.initializeApp(firebaseConfig);
-
-const db=firebase.database();
-
-let pc,room,stream;
-const ice={iceServers:[{urls:"stun:stun.l.google.com:19302"}]};
+let pc, room, stream;
+const ice = { iceServers:[{ urls:"stun:stun.l.google.com:19302" }] };
 
 async function start(){
-  room=db.ref("rooms").push();
-  pc=new RTCPeerConnection(ice);
+  room = db.ref("rooms").push();
+  pc = new RTCPeerConnection(ice);
 
-  stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-  local.srcObject=stream;
-  stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+  stream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  local.srcObject = stream;
+  stream.getTracks().forEach(t => pc.addTrack(t,stream));
 
-  pc.ontrack=e=>remote.srcObject=e.streams[0];
+  pc.ontrack = e => remote.srcObject = e.streams[0];
 
-  pc.onicecandidate=e=>{
+  pc.onicecandidate = e => {
     if(e.candidate) room.child("ice").push(e.candidate.toJSON());
   };
 
-  const offer=await pc.createOffer();
+  const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  room.set({offer});
+  room.set({ offer });
 
-  db.ref("rooms").limitToFirst(1).on("child_added",async s=>{
-    if(s.key!==room.key){
+  db.ref("rooms").limitToFirst(1).on("child_added", async s => {
+    if(s.key !== room.key){
       await pc.setRemoteDescription(new RTCSessionDescription(s.val().offer));
-      const answer=await pc.createAnswer();
+      const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      s.ref.update({answer});
-      room=s.ref;
+      s.ref.update({ answer });
+      room = s.ref;
     }
   });
 
-  room.on("value",s=>{
-    if(s.val()?.answer && !pc.currentRemoteDescription)
+  room.on("value", s => {
+    if(s.val() && s.val().answer && !pc.currentRemoteDescription){
       pc.setRemoteDescription(new RTCSessionDescription(s.val().answer));
+    }
   });
 
-  room.child("chat").on("child_added",s=>{
-    chat.innerHTML+=`<div>${s.val()}</div>`;
+  room.child("chat").on("child_added", s => {
+    chat.innerHTML += `<div>${s.val()}</div>`;
   });
 }
 
 function send(){
-  room.child("chat").push(msg.value);
-  msg.value="";
+  if(room && msg.value){
+    room.child("chat").push(msg.value);
+    msg.value = "";
+  }
 }
 
 function next(){
   location.reload();
-}  >
+}
 </script>
 
 </body>
